@@ -3,6 +3,7 @@
   <component name="AvaloniaProject">
     <option name="projectPerEditor">
       <map>
+        <entry key="VibePlatform/App.axaml" value="VibePlatform/VibePlatform.csproj" />
         <entry key="VibePlatform/Views/MainWindow.axaml" value="VibePlatform/VibePlatform.csproj" />
       </map>
     </option>

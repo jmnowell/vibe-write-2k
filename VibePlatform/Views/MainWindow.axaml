@@ -52,6 +52,8 @@
                        Foreground="Black"
                        Background="White"
                        ShowLineNumbers="True"
-                       VerticalScrollBarVisibility="Auto" />
+                       VerticalScrollBarVisibility="Auto"
+                       MinHeight="300" 
+                       MinWidth="400"/>
     </DockPanel>
 </Window>
