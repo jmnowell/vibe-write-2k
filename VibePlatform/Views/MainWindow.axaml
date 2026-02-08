@@ -19,6 +19,14 @@
                 <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>
+            <MenuItem Header="_Version">
+                <MenuItem Header="_Commit..." InputGesture="Ctrl+K" Click="OnCommitClick" />
+                <MenuItem Header="View _History..." Click="OnViewHistoryClick"
+                          IsEnabled="{Binding HasVersionHistory}" />
+                <Separator />
+                <MenuItem Header="_Revert to Commit..." Click="OnRevertClick"
+                          IsEnabled="{Binding HasVersionHistory}" />
+            </MenuItem>
         </Menu>
 
         <!-- Formatting Toolbar -->

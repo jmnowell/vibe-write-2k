@@ -12,6 +12,9 @@ public partial class MainWindowViewModel : ObservableObject
     private bool _isDirty;
 
     [ObservableProperty]
+    private bool _hasVersionHistory;
+
+    [ObservableProperty]
     private string _windowTitle = "Vibe - Untitled";
 
     public void UpdateTitle()
@@ -46,5 +49,10 @@ public partial class MainWindowViewModel : ObservableObject
     {
         IsDirty = false;
         UpdateTitle();
+    }
+
+    public void UpdateVersionHistoryState(bool hasHistory)
+    {
+        HasVersionHistory = hasHistory;
     }
 }
