@@ -1,0 +1,57 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ae="clr-namespace:AvaloniaEdit;assembly=AvaloniaEdit"
+        xmlns:vm="using:VibePlatform.ViewModels"
+        x:Class="VibePlatform.Views.MainWindow"
+        Title="Vibe - Untitled"
+        Width="900" Height="700"
+        MinWidth="400" MinHeight="300">
+
+    <DockPanel>
+        <!-- Menu Bar -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New" InputGesture="Ctrl+N" Click="OnNewClick" />
+                <MenuItem Header="_Open..." InputGesture="Ctrl+O" Click="OnOpenClick" />
+                <Separator />
+                <MenuItem Header="_Save" InputGesture="Ctrl+S" Click="OnSaveClick" />
+                <MenuItem Header="Save _As..." InputGesture="Ctrl+Shift+S" Click="OnSaveAsClick" />
+                <Separator />
+                <MenuItem Header="E_xit" Click="OnExitClick" />
+            </MenuItem>
+        </Menu>
+
+        <!-- Formatting Toolbar -->
+        <Border DockPanel.Dock="Top" BorderBrush="#DDDDDD" BorderThickness="0,0,0,1"
+                Padding="8,4">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <Button Name="BoldButton" Content="B" FontWeight="Bold"
+                        Width="32" Height="28" Click="OnBoldClick"
+                        ToolTip.Tip="Bold (Ctrl+B)" />
+                <Button Name="ItalicButton" Content="I" FontStyle="Italic"
+                        Width="32" Height="28" Click="OnItalicClick"
+                        ToolTip.Tip="Italic (Ctrl+I)" />
+                <Button Name="UnderlineButton" Width="32" Height="28"
+                        Click="OnUnderlineClick" ToolTip.Tip="Underline (Ctrl+U)">
+                    <TextBlock Text="U" TextDecorations="Underline" />
+                </Button>
+                <Border Width="1" Background="#CCCCCC" Margin="4,2" />
+                <ComboBox Name="HeaderCombo" Width="100" Height="28"
+                          SelectedIndex="0" SelectionChanged="OnHeaderChanged">
+                    <ComboBoxItem Content="Normal" />
+                    <ComboBoxItem Content="Heading 1" />
+                    <ComboBoxItem Content="Heading 2" />
+                    <ComboBoxItem Content="Heading 3" />
+                </ComboBox>
+            </StackPanel>
+        </Border>
+
+        <!-- Editor -->
+        <ae:TextEditor Name="Editor"
+                       FontSize="14"
+                       Foreground="Black"
+                       Background="White"
+                       ShowLineNumbers="True"
+                       VerticalScrollBarVisibility="Auto" />
+    </DockPanel>
+</Window>
