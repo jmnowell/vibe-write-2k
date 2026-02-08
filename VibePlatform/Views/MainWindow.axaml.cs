@@ -20,7 +20,6 @@ public partial class MainWindow : Window
     private readonly MainWindowViewModel _viewModel;
     private readonly MarkdownParserService _parser;
     private readonly MarkdownColorizingTransformer _colorizer;
-    private readonly MarkdownSyntaxHider _syntaxHider;
     private readonly FileService _fileService;
     private readonly VersioningService _versioningService;
     private readonly DispatcherTimer _debounceTimer;
@@ -36,7 +35,6 @@ public partial class MainWindow : Window
 
         _parser = new MarkdownParserService();
         _colorizer = new MarkdownColorizingTransformer();
-        _syntaxHider = new MarkdownSyntaxHider();
         _fileService = new FileService();
         _versioningService = new VersioningService();
 
@@ -46,7 +44,6 @@ public partial class MainWindow : Window
 
         // Wire up editor transformers
         Editor.TextArea.TextView.LineTransformers.Add(_colorizer);
-        Editor.TextArea.TextView.ElementGenerators.Add(_syntaxHider);
 
         // Wire up text change handler
         Editor.TextChanged += OnTextChanged;
@@ -83,8 +80,7 @@ public partial class MainWindow : Window
     {
         string text = Editor.Text;
         var ast = _parser.Parse(text);
-        _colorizer.UpdateAst(ast);
-        _syntaxHider.UpdateAst(ast, text);
+        _colorizer.UpdateAst(ast, text);
         Editor.TextArea.TextView.Redraw();
     }
 
