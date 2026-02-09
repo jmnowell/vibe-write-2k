@@ -17,6 +17,9 @@
                 <MenuItem Header="_Save" InputGesture="Ctrl+S" Click="OnSaveClick" />
                 <MenuItem Header="Save _As..." InputGesture="Ctrl+Shift+S" Click="OnSaveAsClick" />
                 <Separator />
+                <MenuItem Header="_Print..." InputGesture="Ctrl+P" Click="OnPrintClick" />
+                <MenuItem Header="Export to P_DF..." Click="OnExportPdfClick" />
+                <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>
             <MenuItem Header="_View">

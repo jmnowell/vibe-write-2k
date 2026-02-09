@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private readonly MarkdownColorizingTransformer _colorizer;
     private readonly FileService _fileService;
     private readonly VersioningService _versioningService;
+    private readonly PrintService _printService;
     private readonly DispatcherTimer _debounceTimer;
     private bool _suppressTextChanged;
     private bool _initialized;
@@ -38,6 +39,7 @@ public partial class MainWindow : Window
         _colorizer = new MarkdownColorizingTransformer();
         _fileService = new FileService();
         _versioningService = new VersioningService();
+        _printService = new PrintService();
 
         // Set up debounce timer for re-parsing
         _debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
@@ -124,6 +126,10 @@ public partial class MainWindow : Window
                         OnSaveAsClick(this, new RoutedEventArgs());
                     else
                         OnSaveClick(this, new RoutedEventArgs());
+                    e.Handled = true;
+                    break;
+                case Key.P:
+                    OnPrintClick(this, new RoutedEventArgs());
                     e.Handled = true;
                     break;
                 case Key.K:
@@ -243,6 +249,16 @@ public partial class MainWindow : Window
     private void OnExitClick(object? sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private async void OnPrintClick(object? sender, RoutedEventArgs e)
+    {
+        await _printService.PrintAsync(this, Editor.Text);
+    }
+
+    private async void OnExportPdfClick(object? sender, RoutedEventArgs e)
+    {
+        await _printService.ExportToPdfAsync(this, Editor.Text);
     }
 
     protected override async void OnClosing(WindowClosingEventArgs e)
