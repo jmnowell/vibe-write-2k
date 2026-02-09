@@ -10,6 +10,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using AvaloniaEdit;
 using VibePlatform.Editor;
+using VibePlatform.Models;
 using VibePlatform.Services;
 using VibePlatform.ViewModels;
 
@@ -81,11 +82,19 @@ public partial class MainWindow : Window
         string text = Editor.Text;
         var ast = _parser.Parse(text);
         _colorizer.UpdateAst(ast, text);
+        _viewModel.UpdateOutline(ast);
         Editor.TextArea.TextView.Redraw();
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.O)
+        {
+            _viewModel.ToggleOutline();
+            e.Handled = true;
+            return;
+        }
+
         if (e.KeyModifiers == KeyModifiers.Control)
         {
             switch (e.Key)
@@ -150,6 +159,26 @@ public partial class MainWindow : Window
         int level = HeaderCombo.SelectedIndex; // 0=Normal, 1=H1, 2=H2, 3=H3
         FormattingCommands.CycleHeader(Editor, level);
         Editor.Focus();
+    }
+
+    // Outline handlers
+    private void OnToggleOutlineClick(object? sender, RoutedEventArgs e)
+    {
+        _viewModel.ToggleOutline();
+    }
+
+    private void OnOutlineItemSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (OutlineList.SelectedItem is not OutlineItem item) return;
+
+        int line = item.LineNumber + 1; // Markdig 0-based → AvaloniaEdit 1-based
+        var offset = Editor.Document.GetLineByNumber(line).Offset;
+        Editor.TextArea.Caret.Offset = offset;
+        Editor.ScrollToLine(line);
+        Editor.Focus();
+
+        // Clear selection so the same item can be clicked again
+        OutlineList.SelectedItem = null;
     }
 
     // File operations

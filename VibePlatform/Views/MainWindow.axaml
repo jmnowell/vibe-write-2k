@@ -19,6 +19,9 @@
                 <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="Toggle _Outline" InputGesture="Ctrl+Shift+O" Click="OnToggleOutlineClick" />
+            </MenuItem>
             <MenuItem Header="_Version">
                 <MenuItem Header="_Commit..." InputGesture="Ctrl+K" Click="OnCommitClick" />
                 <MenuItem Header="View _History..." Click="OnViewHistoryClick"
@@ -54,14 +57,46 @@
             </StackPanel>
         </Border>
 
-        <!-- Editor -->
-        <ae:TextEditor Name="Editor"
-                       FontSize="14"
-                       Foreground="Black"
-                       Background="White"
-                       ShowLineNumbers="True"
-                       VerticalScrollBarVisibility="Auto"
-                       MinHeight="300" 
-                       MinWidth="400"/>
+        <!-- Editor with Outline Pane -->
+        <Grid ColumnDefinitions="Auto,*">
+            <!-- Outline Pane -->
+            <Border Grid.Column="0"
+                    IsVisible="{Binding IsOutlineVisible}"
+                    Width="220"
+                    Background="#F5F5F5"
+                    BorderBrush="#DDDDDD"
+                    BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Outline"
+                               FontWeight="SemiBold"
+                               Margin="12,8,12,4" />
+                    <ListBox Name="OutlineList"
+                             ItemsSource="{Binding OutlineItems}"
+                             Background="Transparent"
+                             SelectionChanged="OnOutlineItemSelected">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Title}"
+                                           Margin="{Binding IndentMargin}"
+                                           Padding="0,2"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- Editor -->
+            <ae:TextEditor Name="Editor"
+                           Grid.Column="1"
+                           FontSize="14"
+                           Foreground="Black"
+                           Background="White"
+                           ShowLineNumbers="True"
+                           VerticalScrollBarVisibility="Auto"
+                           MinHeight="300"
+                           MinWidth="400"/>
+        </Grid>
     </DockPanel>
 </Window>
