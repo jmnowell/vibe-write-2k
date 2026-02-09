@@ -26,4 +26,5 @@
 /VibePlatform/obj/rider.project.restore.info
 /VibePlatform/obj/VibePlatform.csproj.nuget.dgspec.json
 /VibePlatform/obj/VibePlatform.csproj.nuget.g.props
+/VibePlatform/bin/*
 /VibePlatform/obj/VibePlatform.csproj.nuget.g.targets
