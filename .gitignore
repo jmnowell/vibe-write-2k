@@ -28,3 +28,7 @@
 /VibePlatform/obj/VibePlatform.csproj.nuget.g.props
 /VibePlatform/bin/*
 /VibePlatform/obj/VibePlatform.csproj.nuget.g.targets
+/VibePlatform.Tests/bin/*
+/VibePlatform.Tests/obj/*
+/VibePlatform.Tests/obj/Debug/*
+claude_resume.txt

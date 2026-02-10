@@ -9,7 +9,7 @@
 
     <DockPanel>
         <!-- Menu Bar -->
-        <Menu DockPanel.Dock="Top">
+        <Menu Name="MainMenu" DockPanel.Dock="Top">
             <MenuItem Header="_File">
                 <MenuItem Header="_New" InputGesture="Ctrl+N" Click="OnNewClick" />
                 <MenuItem Header="_Open..." InputGesture="Ctrl+O" Click="OnOpenClick" />
@@ -24,6 +24,7 @@
             </MenuItem>
             <MenuItem Header="_View">
                 <MenuItem Header="Toggle _Outline" InputGesture="Ctrl+Shift+O" Click="OnToggleOutlineClick" />
+                <MenuItem Header="_Focus Mode" InputGesture="F11" Click="OnToggleFocusModeClick" />
             </MenuItem>
             <MenuItem Header="_Version">
                 <MenuItem Header="_Commit..." InputGesture="Ctrl+K" Click="OnCommitClick" />
@@ -36,7 +37,7 @@
         </Menu>
 
         <!-- Formatting Toolbar -->
-        <Border DockPanel.Dock="Top" BorderBrush="#DDDDDD" BorderThickness="0,0,0,1"
+        <Border Name="FormattingToolbar" DockPanel.Dock="Top" BorderBrush="#DDDDDD" BorderThickness="0,0,0,1"
                 Padding="8,4">
             <StackPanel Orientation="Horizontal" Spacing="4">
                 <Button Name="BoldButton" Content="B" FontWeight="Bold"

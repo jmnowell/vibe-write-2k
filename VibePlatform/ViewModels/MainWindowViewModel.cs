@@ -23,6 +23,9 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _isOutlineVisible;
 
+    [ObservableProperty]
+    private bool _isFocusMode;
+
     public ObservableCollection<OutlineItem> OutlineItems { get; } = new();
 
     public void UpdateTitle()
@@ -68,6 +71,8 @@ public partial class MainWindowViewModel : ObservableObject
     {
         IsOutlineVisible = !IsOutlineVisible;
     }
+
+    public void ToggleFocusMode() => IsFocusMode = !IsFocusMode;
 
     public void UpdateOutline(MarkdownDocument? ast)
     {

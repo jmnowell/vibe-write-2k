@@ -25,8 +25,12 @@ public partial class MainWindow : Window
     private readonly VersioningService _versioningService;
     private readonly PrintService _printService;
     private readonly DispatcherTimer _debounceTimer;
+    private readonly FocusModeTransformer _focusTransformer = new();
     private bool _suppressTextChanged;
     private bool _initialized;
+    private bool _wasOutlineVisible;
+    private bool _wasFocusModeWordWrap;
+    private Thickness _savedTextViewMargin;
 
     public MainWindow()
     {
@@ -90,6 +94,13 @@ public partial class MainWindow : Window
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Key == Key.F11 && e.KeyModifiers == KeyModifiers.None)
+        {
+            ToggleFocusMode();
+            e.Handled = true;
+            return;
+        }
+
         if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.O)
         {
             _viewModel.ToggleOutline();
@@ -185,6 +196,104 @@ public partial class MainWindow : Window
 
         // Clear selection so the same item can be clicked again
         OutlineList.SelectedItem = null;
+    }
+
+    // Focus mode
+    private void OnToggleFocusModeClick(object? sender, RoutedEventArgs e)
+    {
+        ToggleFocusMode();
+    }
+
+    private void ToggleFocusMode()
+    {
+        _viewModel.ToggleFocusMode();
+
+        if (_viewModel.IsFocusMode)
+        {
+            // Save state to restore later
+            _wasOutlineVisible = _viewModel.IsOutlineVisible;
+            _wasFocusModeWordWrap = Editor.WordWrap;
+
+            // Enter focus mode
+            WindowState = WindowState.FullScreen;
+            MainMenu.IsVisible = false;
+            FormattingToolbar.IsVisible = false;
+            _viewModel.IsOutlineVisible = false;
+            Editor.ShowLineNumbers = false;
+            Editor.WordWrap = true;
+
+            // Add dimming transformer
+            Editor.TextArea.TextView.LineTransformers.Add(_focusTransformer);
+
+            // Add vertical margin to the TextView so first/last lines can scroll to center
+            _savedTextViewMargin = Editor.TextArea.TextView.Margin;
+            Editor.SizeChanged += OnFocusModeEditorSizeChanged;
+            UpdateFocusModeMargin();
+
+            // Subscribe to caret changes
+            Editor.TextArea.Caret.PositionChanged += OnFocusCaretPositionChanged;
+
+            // Set initial focused line, redraw, and scroll to center (deferred for layout)
+            _focusTransformer.SetFocusedLine(Editor.TextArea.Caret.Line);
+            Editor.TextArea.TextView.Redraw();
+            Dispatcher.UIThread.Post(ScrollCaretToCenter, DispatcherPriority.Loaded);
+        }
+        else
+        {
+            // Exit focus mode
+            WindowState = WindowState.Normal;
+            MainMenu.IsVisible = true;
+            FormattingToolbar.IsVisible = true;
+            Editor.ShowLineNumbers = true;
+            Editor.WordWrap = _wasFocusModeWordWrap;
+
+            // Restore outline visibility
+            _viewModel.IsOutlineVisible = _wasOutlineVisible;
+
+            // Remove dimming transformer
+            Editor.TextArea.TextView.LineTransformers.Remove(_focusTransformer);
+
+            // Restore margin and unsubscribe from size changes
+            Editor.TextArea.TextView.Margin = _savedTextViewMargin;
+            Editor.SizeChanged -= OnFocusModeEditorSizeChanged;
+
+            // Unsubscribe from caret changes
+            Editor.TextArea.Caret.PositionChanged -= OnFocusCaretPositionChanged;
+
+            Editor.TextArea.TextView.Redraw();
+        }
+    }
+
+    private void OnFocusCaretPositionChanged(object? sender, EventArgs e)
+    {
+        _focusTransformer.SetFocusedLine(Editor.TextArea.Caret.Line);
+        Editor.TextArea.TextView.Redraw();
+        ScrollCaretToCenter();
+    }
+
+    private void OnFocusModeEditorSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        UpdateFocusModeMargin();
+        Dispatcher.UIThread.Post(ScrollCaretToCenter, DispatcherPriority.Loaded);
+    }
+
+    private void UpdateFocusModeMargin()
+    {
+        var halfViewport = Editor.Bounds.Height / 2;
+        Editor.TextArea.TextView.Margin = new Thickness(0, halfViewport, 0, halfViewport);
+    }
+
+    private void ScrollCaretToCenter()
+    {
+        var textView = Editor.TextArea.TextView;
+        var lineHeight = textView.DefaultLineHeight;
+        var caretLine = Editor.TextArea.Caret.Line;
+        // The margin offsets the content, so line positions are shifted down by the margin
+        var marginTop = Editor.TextArea.TextView.Margin.Top;
+        var lineTop = marginTop + (caretLine - 1) * lineHeight;
+        var viewportHeight = Editor.Bounds.Height;
+        var targetOffset = lineTop - (viewportHeight / 2) + (lineHeight / 2);
+        Editor.ScrollToVerticalOffset(Math.Max(0, targetOffset));
     }
 
     // File operations
