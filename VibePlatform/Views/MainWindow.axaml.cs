@@ -9,6 +9,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
 using AvaloniaEdit;
+using AvaloniaEdit.Rendering;
 using VibePlatform.Editor;
 using VibePlatform.Models;
 using VibePlatform.Services;
@@ -30,7 +31,8 @@ public partial class MainWindow : Window
     private bool _initialized;
     private bool _wasOutlineVisible;
     private bool _wasFocusModeWordWrap;
-    private Thickness _savedTextViewMargin;
+    private ITransform? _savedTextViewTransform;
+    private TranslateTransform? _focusModeTransform;
 
     public MainWindow()
     {
@@ -225,10 +227,11 @@ public partial class MainWindow : Window
             // Add dimming transformer
             Editor.TextArea.TextView.LineTransformers.Add(_focusTransformer);
 
-            // Add vertical margin to the TextView so first/last lines can scroll to center
-            _savedTextViewMargin = Editor.TextArea.TextView.Margin;
+            // Centering: translate the text view so the caret line stays in the middle.
+            _savedTextViewTransform = Editor.TextArea.TextView.RenderTransform;
+            _focusModeTransform = new TranslateTransform();
+            Editor.TextArea.TextView.RenderTransform = _focusModeTransform;
             Editor.SizeChanged += OnFocusModeEditorSizeChanged;
-            UpdateFocusModeMargin();
 
             // Subscribe to caret changes
             Editor.TextArea.Caret.PositionChanged += OnFocusCaretPositionChanged;
@@ -253,8 +256,10 @@ public partial class MainWindow : Window
             // Remove dimming transformer
             Editor.TextArea.TextView.LineTransformers.Remove(_focusTransformer);
 
-            // Restore margin and unsubscribe from size changes
-            Editor.TextArea.TextView.Margin = _savedTextViewMargin;
+            // Restore transform and unsubscribe from size changes
+            Editor.TextArea.TextView.RenderTransform = _savedTextViewTransform;
+            _savedTextViewTransform = null;
+            _focusModeTransform = null;
             Editor.SizeChanged -= OnFocusModeEditorSizeChanged;
 
             // Unsubscribe from caret changes
@@ -273,27 +278,24 @@ public partial class MainWindow : Window
 
     private void OnFocusModeEditorSizeChanged(object? sender, SizeChangedEventArgs e)
     {
-        UpdateFocusModeMargin();
         Dispatcher.UIThread.Post(ScrollCaretToCenter, DispatcherPriority.Loaded);
-    }
-
-    private void UpdateFocusModeMargin()
-    {
-        var halfViewport = Editor.Bounds.Height / 2;
-        Editor.TextArea.TextView.Margin = new Thickness(0, halfViewport, 0, halfViewport);
     }
 
     private void ScrollCaretToCenter()
     {
         var textView = Editor.TextArea.TextView;
-        var lineHeight = textView.DefaultLineHeight;
-        var caretLine = Editor.TextArea.Caret.Line;
-        // The margin offsets the content, so line positions are shifted down by the margin
-        var marginTop = Editor.TextArea.TextView.Margin.Top;
-        var lineTop = marginTop + (caretLine - 1) * lineHeight;
-        var viewportHeight = Editor.Bounds.Height;
-        var targetOffset = lineTop - (viewportHeight / 2) + (lineHeight / 2);
-        Editor.ScrollToVerticalOffset(Math.Max(0, targetOffset));
+        Editor.TextArea.Caret.BringCaretToView();
+        textView.EnsureVisualLines();
+        var caretPosition = Editor.TextArea.Caret.Position;
+        var caretVisual = textView.GetVisualPosition(caretPosition, VisualYPosition.LineMiddle);
+        var viewportHeight = textView.Bounds.Height;
+        if (viewportHeight <= 0 || double.IsNaN(caretVisual.Y) || double.IsInfinity(caretVisual.Y)) return;
+        var offset = (viewportHeight / 2) - caretVisual.Y;
+        if (double.IsNaN(offset) || double.IsInfinity(offset)) return;
+        _focusModeTransform ??= new TranslateTransform();
+        _focusModeTransform.X = 0;
+        _focusModeTransform.Y = offset;
+        textView.RenderTransform = _focusModeTransform;
     }
 
     // File operations
