@@ -2,13 +2,14 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using VibePlatform.Services;
-using Xunit;
+using NUnit.Framework;
 
 namespace VibePlatform.Tests.Services;
 
+[TestFixture]
 public class VersioningServiceTests
 {
-    [Fact]
+    [Test]
     public async Task LoadHistoryAsync_ReturnsEmpty_WhenMissing()
     {
         var service = new VersioningService();
@@ -21,7 +22,7 @@ public class VersioningServiceTests
 
             var history = await service.LoadHistoryAsync(filePath);
 
-            Assert.Empty(history.Commits);
+            Assert.That(history.Commits, Is.Empty);
         }
         finally
         {
@@ -29,7 +30,7 @@ public class VersioningServiceTests
         }
     }
 
-    [Fact]
+    [Test]
     public async Task CommitAsync_CreatesHistoryAndSnapshot()
     {
         var service = new VersioningService();
@@ -40,19 +41,19 @@ public class VersioningServiceTests
         {
             await File.WriteAllTextAsync(filePath, "hello");
 
-            Assert.False(service.HasHistory(filePath));
+            Assert.That(service.HasHistory(filePath), Is.False);
 
             var commit = await service.CommitAsync(filePath, "first");
 
-            Assert.True(service.HasHistory(filePath));
+            Assert.That(service.HasHistory(filePath), Is.True);
 
             var history = await service.LoadHistoryAsync(filePath);
-            Assert.Single(history.Commits);
-            Assert.Equal(commit.Id, history.Commits[0].Id);
-            Assert.Equal(new FileInfo(filePath).Length, history.Commits[0].FileSizeBytes);
+            Assert.That(history.Commits, Has.Count.EqualTo(1));
+            Assert.That(history.Commits[0].Id, Is.EqualTo(commit.Id));
+            Assert.That(history.Commits[0].FileSizeBytes, Is.EqualTo(new FileInfo(filePath).Length));
 
             var snapshot = await service.GetSnapshotContentAsync(filePath, commit.Id);
-            Assert.Equal("hello", snapshot);
+            Assert.That(snapshot, Is.EqualTo("hello"));
         }
         finally
         {

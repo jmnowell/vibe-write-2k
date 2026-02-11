@@ -1,13 +1,14 @@
 using System.IO;
 using VibePlatform.Editor;
 using VibePlatform.ViewModels;
-using Xunit;
+using NUnit.Framework;
 
 namespace VibePlatform.Tests.ViewModels;
 
+[TestFixture]
 public class MainWindowViewModelTests
 {
-    [Fact]
+    [Test]
     public void MarkDirty_AppendsAsteriskInTitle()
     {
         var viewModel = new MainWindowViewModel();
@@ -16,24 +17,24 @@ public class MainWindowViewModelTests
         viewModel.SetFilePath(path);
         viewModel.MarkDirty();
 
-        Assert.Equal("Vibe - notes.md *", viewModel.WindowTitle);
+        Assert.That(viewModel.WindowTitle, Is.EqualTo("Vibe - notes.md *"));
     }
 
-    [Fact]
+    [Test]
     public void ToggleOutline_FlipsVisibility()
     {
         var viewModel = new MainWindowViewModel();
 
-        Assert.False(viewModel.IsOutlineVisible);
+        Assert.That(viewModel.IsOutlineVisible, Is.False);
 
         viewModel.ToggleOutline();
-        Assert.True(viewModel.IsOutlineVisible);
+        Assert.That(viewModel.IsOutlineVisible, Is.True);
 
         viewModel.ToggleOutline();
-        Assert.False(viewModel.IsOutlineVisible);
+        Assert.That(viewModel.IsOutlineVisible, Is.False);
     }
 
-    [Fact]
+    [Test]
     public void UpdateOutline_CollectsHeadings()
     {
         var viewModel = new MainWindowViewModel();
@@ -43,13 +44,13 @@ public class MainWindowViewModelTests
         var ast = parser.Parse(markdown);
         viewModel.UpdateOutline(ast);
 
-        Assert.Equal(2, viewModel.OutlineItems.Count);
-        Assert.Equal("Title", viewModel.OutlineItems[0].Title);
-        Assert.Equal(1, viewModel.OutlineItems[0].Level);
-        Assert.Equal(0, viewModel.OutlineItems[0].LineNumber);
+        Assert.That(viewModel.OutlineItems, Has.Count.EqualTo(2));
+        Assert.That(viewModel.OutlineItems[0].Title, Is.EqualTo("Title"));
+        Assert.That(viewModel.OutlineItems[0].Level, Is.EqualTo(1));
+        Assert.That(viewModel.OutlineItems[0].LineNumber, Is.EqualTo(0));
 
-        Assert.Equal("Section", viewModel.OutlineItems[1].Title);
-        Assert.Equal(2, viewModel.OutlineItems[1].Level);
-        Assert.Equal(2, viewModel.OutlineItems[1].LineNumber);
+        Assert.That(viewModel.OutlineItems[1].Title, Is.EqualTo("Section"));
+        Assert.That(viewModel.OutlineItems[1].Level, Is.EqualTo(2));
+        Assert.That(viewModel.OutlineItems[1].LineNumber, Is.EqualTo(2));
     }
 }
