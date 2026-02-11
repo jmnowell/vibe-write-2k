@@ -25,6 +25,7 @@ public partial class MainWindow : Window
     private readonly FileService _fileService;
     private readonly VersioningService _versioningService;
     private readonly PrintService _printService;
+    private readonly SpellCheckService _spellCheckService;
     private readonly DispatcherTimer _debounceTimer;
     private readonly FocusModeTransformer _focusTransformer = new();
     private bool _suppressTextChanged;
@@ -47,6 +48,7 @@ public partial class MainWindow : Window
         _fileService = new FileService();
         _versioningService = new VersioningService();
         _printService = new PrintService();
+        _spellCheckService = new SpellCheckService();
 
         // Set up debounce timer for re-parsing
         _debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
@@ -107,6 +109,13 @@ public partial class MainWindow : Window
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Key == Key.F7 && e.KeyModifiers == KeyModifiers.None)
+        {
+            OnCheckSpellingClick(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.F11 && e.KeyModifiers == KeyModifiers.None)
         {
             ToggleFocusMode();
@@ -483,6 +492,367 @@ public partial class MainWindow : Window
         await System.IO.File.WriteAllTextAsync(filePath, content);
         _viewModel.MarkClean();
         ReparseAndRedraw();
+    }
+
+    // Spell check
+    private async void OnCheckSpellingClick(object? sender, RoutedEventArgs e)
+    {
+        await _spellCheckService.EnsureLoadedAsync();
+
+        var text = Editor.Text;
+        var ast = _parser.Parse(text);
+        var extractor = new MarkdownWordExtractor();
+        var allWords = extractor.ExtractWords(text, ast);
+
+        // Group by word (case-insensitive), filter misspelled
+        var misspelled = new List<MisspelledWord>();
+        var grouped = new Dictionary<string, MisspelledWord>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var occ in allWords)
+        {
+            if (_spellCheckService.IsCorrect(occ.Word)) continue;
+
+            if (!grouped.TryGetValue(occ.Word, out var entry))
+            {
+                entry = new MisspelledWord
+                {
+                    Word = occ.Word,
+                    Suggestions = _spellCheckService.GetSuggestions(occ.Word)
+                };
+                grouped[occ.Word] = entry;
+                misspelled.Add(entry);
+            }
+
+            entry.Locations.Add(new WordLocation(occ.Offset, occ.Length));
+        }
+
+        if (misspelled.Count == 0)
+        {
+            await ShowMessageAsync("Spell Check", "No misspellings found.");
+            return;
+        }
+
+        await ShowSpellCheckDialogAsync(misspelled);
+    }
+
+    private async System.Threading.Tasks.Task ShowSpellCheckDialogAsync(List<MisspelledWord> misspelled)
+    {
+        var dialog = new Window
+        {
+            Title = "Spell Check",
+            Width = 700,
+            Height = 450,
+            MinWidth = 500,
+            MinHeight = 350,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = true
+        };
+
+        var ignoredWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int currentOccurrenceIndex = 0;
+
+        // Main layout
+        var rootPanel = new DockPanel { Margin = new Thickness(12) };
+
+        // Bottom close button
+        var closeBtn = new Button
+        {
+            Content = "Close",
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+        closeBtn.Click += (_, _) => dialog.Close();
+        DockPanel.SetDock(closeBtn, Avalonia.Controls.Dock.Bottom);
+        rootPanel.Children.Add(closeBtn);
+
+        // Main content grid: left (word list) | right (details)
+        var mainGrid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,12,1.5*")
+        };
+
+        // Left panel - misspelled word list
+        var leftPanel = new DockPanel();
+        var wordCountLabel = new TextBlock
+        {
+            Text = $"Misspelled Words ({misspelled.Count})",
+            FontWeight = FontWeight.SemiBold,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        DockPanel.SetDock(wordCountLabel, Avalonia.Controls.Dock.Top);
+        leftPanel.Children.Add(wordCountLabel);
+
+        var wordList = new ListBox();
+        foreach (var word in misspelled)
+        {
+            wordList.Items.Add(new ListBoxItem
+            {
+                Content = $"{word.Word}  ({word.Locations.Count})",
+                Tag = word
+            });
+        }
+        leftPanel.Children.Add(wordList);
+
+        // Right panel - details and actions
+        var rightPanel = new StackPanel { Spacing = 8 };
+
+        var wordLabel = new TextBlock { FontWeight = FontWeight.SemiBold, FontSize = 16 };
+        var occurrenceLabel = new TextBlock { Foreground = Brushes.Gray };
+        rightPanel.Children.Add(wordLabel);
+        rightPanel.Children.Add(occurrenceLabel);
+
+        var suggestionsLabel = new TextBlock { Text = "Suggestions:", Margin = new Thickness(0, 4, 0, 0) };
+        rightPanel.Children.Add(suggestionsLabel);
+
+        var suggestionsList = new ListBox { Height = 120 };
+        rightPanel.Children.Add(suggestionsList);
+
+        var replaceLabel = new TextBlock { Text = "Replace with:", Margin = new Thickness(0, 4, 0, 0) };
+        rightPanel.Children.Add(replaceLabel);
+
+        var replaceBox = new TextBox();
+        rightPanel.Children.Add(replaceBox);
+
+        // Action buttons
+        var actionRow1 = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+        var replaceBtn = new Button { Content = "Replace" };
+        var replaceAllBtn = new Button { Content = "Replace All" };
+        actionRow1.Children.Add(replaceBtn);
+        actionRow1.Children.Add(replaceAllBtn);
+        rightPanel.Children.Add(actionRow1);
+
+        var actionRow2 = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8
+        };
+        var ignoreBtn = new Button { Content = "Ignore" };
+        var ignoreAllBtn = new Button { Content = "Ignore All" };
+        var addDictBtn = new Button { Content = "Add to Dictionary" };
+        actionRow2.Children.Add(ignoreBtn);
+        actionRow2.Children.Add(ignoreAllBtn);
+        actionRow2.Children.Add(addDictBtn);
+        rightPanel.Children.Add(actionRow2);
+
+        Grid.SetColumn(leftPanel, 0);
+        Grid.SetColumn(rightPanel, 2);
+        mainGrid.Children.Add(leftPanel);
+        mainGrid.Children.Add(rightPanel);
+
+        rootPanel.Children.Add(mainGrid);
+        dialog.Content = rootPanel;
+
+        // Track cumulative offset changes from replacements
+        int cumulativeOffset = 0;
+
+        // Helper to select/highlight word in editor
+        void HighlightWord(MisspelledWord word, int occIndex)
+        {
+            if (occIndex < 0 || occIndex >= word.Locations.Count) return;
+            var loc = word.Locations[occIndex];
+            int adjustedOffset = loc.Offset + cumulativeOffset;
+            if (adjustedOffset >= 0 && adjustedOffset + loc.Length <= Editor.Document.TextLength)
+            {
+                Editor.Select(adjustedOffset, loc.Length);
+                var line = Editor.Document.GetLineByOffset(adjustedOffset);
+                Editor.ScrollToLine(line.LineNumber);
+            }
+        }
+
+        // Helper to update display for selected word
+        void UpdateDisplay(MisspelledWord? word)
+        {
+            if (word == null)
+            {
+                wordLabel.Text = "";
+                occurrenceLabel.Text = "";
+                suggestionsList.Items.Clear();
+                replaceBox.Text = "";
+                return;
+            }
+
+            wordLabel.Text = $"\"{word.Word}\"";
+            occurrenceLabel.Text = word.Locations.Count > 0
+                ? $"Occurrence {currentOccurrenceIndex + 1} of {word.Locations.Count}"
+                : "No occurrences";
+
+            suggestionsList.Items.Clear();
+            foreach (var s in word.Suggestions)
+                suggestionsList.Items.Add(s);
+
+            if (word.Suggestions.Count > 0)
+            {
+                replaceBox.Text = word.Suggestions[0];
+                suggestionsList.SelectedIndex = 0;
+            }
+            else
+            {
+                replaceBox.Text = "";
+            }
+
+            if (word.Locations.Count > 0)
+                HighlightWord(word, currentOccurrenceIndex);
+        }
+
+        // Helper to remove current word from list and advance
+        void RemoveCurrentWordFromList()
+        {
+            int selectedIdx = wordList.SelectedIndex;
+            if (selectedIdx < 0) return;
+
+            wordList.Items.RemoveAt(selectedIdx);
+            wordCountLabel.Text = $"Misspelled Words ({wordList.Items.Count})";
+
+            if (wordList.Items.Count == 0)
+            {
+                UpdateDisplay(null);
+                return;
+            }
+
+            if (selectedIdx >= wordList.Items.Count)
+                selectedIdx = wordList.Items.Count - 1;
+            wordList.SelectedIndex = selectedIdx;
+        }
+
+        // Helper to advance to next occurrence or next word
+        void AdvanceOccurrence(MisspelledWord word)
+        {
+            currentOccurrenceIndex++;
+            if (currentOccurrenceIndex >= word.Locations.Count)
+            {
+                // All occurrences handled, remove word from list
+                RemoveCurrentWordFromList();
+            }
+            else
+            {
+                UpdateDisplay(word);
+            }
+        }
+
+        // Wire up word list selection
+        wordList.SelectionChanged += (_, _) =>
+        {
+            if (wordList.SelectedItem is ListBoxItem item && item.Tag is MisspelledWord word)
+            {
+                currentOccurrenceIndex = 0;
+                UpdateDisplay(word);
+            }
+        };
+
+        // Wire up suggestion selection to fill replace box
+        suggestionsList.SelectionChanged += (_, _) =>
+        {
+            if (suggestionsList.SelectedItem is string suggestion)
+                replaceBox.Text = suggestion;
+        };
+
+        // Replace button
+        replaceBtn.Click += (_, _) =>
+        {
+            if (wordList.SelectedItem is not ListBoxItem item || item.Tag is not MisspelledWord word) return;
+            if (currentOccurrenceIndex >= word.Locations.Count) return;
+            var replacement = replaceBox.Text ?? "";
+
+            var loc = word.Locations[currentOccurrenceIndex];
+            int adjustedOffset = loc.Offset + cumulativeOffset;
+
+            if (adjustedOffset >= 0 && adjustedOffset + loc.Length <= Editor.Document.TextLength)
+            {
+                Editor.Document.Replace(adjustedOffset, loc.Length, replacement);
+                int delta = replacement.Length - loc.Length;
+                cumulativeOffset += delta;
+
+                // Adjust offsets of remaining locations for this word
+                for (int i = currentOccurrenceIndex + 1; i < word.Locations.Count; i++)
+                {
+                    var nextLoc = word.Locations[i];
+                    if (nextLoc.Offset > loc.Offset)
+                    {
+                        word.Locations[i] = new WordLocation(nextLoc.Offset + delta, nextLoc.Length);
+                    }
+                }
+            }
+
+            // Remove this occurrence
+            word.Locations.RemoveAt(currentOccurrenceIndex);
+
+            // Update the list item text
+            if (word.Locations.Count > 0)
+            {
+                item.Content = $"{word.Word}  ({word.Locations.Count})";
+            }
+
+            if (word.Locations.Count == 0 || currentOccurrenceIndex >= word.Locations.Count)
+            {
+                if (word.Locations.Count == 0)
+                    RemoveCurrentWordFromList();
+                else
+                {
+                    currentOccurrenceIndex = 0;
+                    UpdateDisplay(word);
+                }
+            }
+            else
+            {
+                UpdateDisplay(word);
+            }
+        };
+
+        // Replace All button
+        replaceAllBtn.Click += (_, _) =>
+        {
+            if (wordList.SelectedItem is not ListBoxItem item || item.Tag is not MisspelledWord word) return;
+            var replacement = replaceBox.Text ?? "";
+
+            // Replace from end to start to maintain offset consistency
+            var sortedLocs = word.Locations.OrderByDescending(l => l.Offset).ToList();
+            foreach (var loc in sortedLocs)
+            {
+                int adjustedOffset = loc.Offset + cumulativeOffset;
+                if (adjustedOffset >= 0 && adjustedOffset + loc.Length <= Editor.Document.TextLength)
+                {
+                    Editor.Document.Replace(adjustedOffset, loc.Length, replacement);
+                    cumulativeOffset += replacement.Length - loc.Length;
+                }
+            }
+
+            word.Locations.Clear();
+            RemoveCurrentWordFromList();
+        };
+
+        // Ignore button
+        ignoreBtn.Click += (_, _) =>
+        {
+            if (wordList.SelectedItem is not ListBoxItem item || item.Tag is not MisspelledWord word) return;
+            AdvanceOccurrence(word);
+        };
+
+        // Ignore All button
+        ignoreAllBtn.Click += (_, _) =>
+        {
+            if (wordList.SelectedItem is not ListBoxItem item || item.Tag is not MisspelledWord word) return;
+            ignoredWords.Add(word.Word);
+            RemoveCurrentWordFromList();
+        };
+
+        // Add to Dictionary button
+        addDictBtn.Click += async (_, _) =>
+        {
+            if (wordList.SelectedItem is not ListBoxItem item || item.Tag is not MisspelledWord word) return;
+            await _spellCheckService.AddToUserDictionaryAsync(word.Word);
+            RemoveCurrentWordFromList();
+        };
+
+        // Select first word
+        if (wordList.Items.Count > 0)
+            wordList.SelectedIndex = 0;
+
+        await dialog.ShowDialog(this);
     }
 
     // Dialog helpers
