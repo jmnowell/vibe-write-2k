@@ -30,9 +30,10 @@ public partial class MainWindow : Window
     private bool _suppressTextChanged;
     private bool _initialized;
     private bool _wasOutlineVisible;
-    private bool _wasFocusModeWordWrap;
     private ITransform? _savedTextViewTransform;
     private TranslateTransform? _focusModeTransform;
+    private double _savedFontSize;
+    private HorizontalAlignment _savedHorizontalAlignment;
 
     public MainWindow()
     {
@@ -50,6 +51,10 @@ public partial class MainWindow : Window
         // Set up debounce timer for re-parsing
         _debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _debounceTimer.Tick += OnDebounceTimerTick;
+
+        // Enable word wrap and constrain to 80 characters
+        Editor.WordWrap = true;
+        UpdateEditorMaxWidth();
 
         // Wire up editor transformers
         Editor.TextArea.TextView.LineTransformers.Add(_colorizer);
@@ -85,6 +90,12 @@ public partial class MainWindow : Window
         ReparseAndRedraw();
     }
 
+    private void UpdateEditorMaxWidth()
+    {
+        var charWidth = Editor.TextArea.TextView.WideSpaceWidth;
+        Editor.MaxWidth = charWidth * 80 + 40; // 80 chars + small extra for scrollbar
+    }
+
     private void ReparseAndRedraw()
     {
         string text = Editor.Text;
@@ -97,6 +108,13 @@ public partial class MainWindow : Window
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.F11 && e.KeyModifiers == KeyModifiers.None)
+        {
+            ToggleFocusMode();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Escape && _viewModel.IsFocusMode)
         {
             ToggleFocusMode();
             e.Handled = true;
@@ -214,7 +232,6 @@ public partial class MainWindow : Window
         {
             // Save state to restore later
             _wasOutlineVisible = _viewModel.IsOutlineVisible;
-            _wasFocusModeWordWrap = Editor.WordWrap;
 
             // Enter focus mode
             WindowState = WindowState.FullScreen;
@@ -222,7 +239,15 @@ public partial class MainWindow : Window
             FormattingToolbar.IsVisible = false;
             _viewModel.IsOutlineVisible = false;
             Editor.ShowLineNumbers = false;
-            Editor.WordWrap = true;
+
+            // Increase font size for fullscreen readability and recalculate 80-char width
+            _savedFontSize = Editor.FontSize;
+            Editor.FontSize = _savedFontSize * 1.4;
+            UpdateEditorMaxWidth();
+
+            // Center the editor on screen (text stays left-aligned within)
+            _savedHorizontalAlignment = Editor.HorizontalAlignment;
+            Editor.HorizontalAlignment = HorizontalAlignment.Center;
 
             // Add dimming transformer
             Editor.TextArea.TextView.LineTransformers.Add(_focusTransformer);
@@ -248,10 +273,14 @@ public partial class MainWindow : Window
             MainMenu.IsVisible = true;
             FormattingToolbar.IsVisible = true;
             Editor.ShowLineNumbers = true;
-            Editor.WordWrap = _wasFocusModeWordWrap;
 
             // Restore outline visibility
             _viewModel.IsOutlineVisible = _wasOutlineVisible;
+
+            // Restore font size, recalculate 80-char width, and restore alignment
+            Editor.FontSize = _savedFontSize;
+            UpdateEditorMaxWidth();
+            Editor.HorizontalAlignment = _savedHorizontalAlignment;
 
             // Remove dimming transformer
             Editor.TextArea.TextView.LineTransformers.Remove(_focusTransformer);
