@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VibeWrite2k", "VibeWrite2k\VibeWrite2k.csproj", "{B42B97DC-728D-47C3-9DDE-8B823EEFBC2A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VibeWrite2k.Tests", "VibeWrite2k.Tests\VibeWrite2k.Tests.csproj", "{F0A97105-229E-4A24-B6EA-714EFF4BCFB3}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B42B97DC-728D-47C3-9DDE-8B823EEFBC2A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B42B97DC-728D-47C3-9DDE-8B823EEFBC2A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B42B97DC-728D-47C3-9DDE-8B823EEFBC2A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B42B97DC-728D-47C3-9DDE-8B823EEFBC2A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F0A97105-229E-4A24-B6EA-714EFF4BCFB3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F0A97105-229E-4A24-B6EA-714EFF4BCFB3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F0A97105-229E-4A24-B6EA-714EFF4BCFB3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F0A97105-229E-4A24-B6EA-714EFF4BCFB3}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

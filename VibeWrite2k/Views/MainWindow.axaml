@@ -1,0 +1,152 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ae="clr-namespace:AvaloniaEdit;assembly=AvaloniaEdit"
+        xmlns:vm="using:VibePlatform.ViewModels"
+        x:Class="VibePlatform.Views.MainWindow"
+        Title="Vibe - Untitled"
+        Width="900" Height="700"
+        MinWidth="400" MinHeight="300">
+
+    <DockPanel>
+        <!-- Menu Bar -->
+        <Menu Name="MainMenu" DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New" InputGesture="Ctrl+N" Click="OnNewClick" />
+                <MenuItem Header="_Open..." InputGesture="Ctrl+O" Click="OnOpenClick" />
+                <Separator />
+                <MenuItem Header="New _Project..." Click="OnNewProjectClick" />
+                <MenuItem Header="Open P_roject..." Click="OnOpenProjectClick" />
+                <Separator />
+                <MenuItem Header="_Save" InputGesture="Ctrl+S" Click="OnSaveClick" />
+                <MenuItem Header="Save _As..." InputGesture="Ctrl+Shift+S" Click="OnSaveAsClick" />
+                <Separator />
+                <MenuItem Header="_Print..." InputGesture="Ctrl+P" Click="OnPrintClick" />
+                <MenuItem Header="Export to P_DF..." Click="OnExportPdfClick" />
+                <Separator />
+                <MenuItem Header="E_xit" Click="OnExitClick" />
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="Toggle _Outline" InputGesture="Ctrl+Shift+O" Click="OnToggleOutlineClick" />
+                <MenuItem Header="_Focus Mode" InputGesture="F11" Click="OnToggleFocusModeClick" />
+            </MenuItem>
+            <MenuItem Header="_Tools">
+                <MenuItem Header="_Check Spelling..." InputGesture="F7" Click="OnCheckSpellingClick" />
+            </MenuItem>
+            <MenuItem Header="_Version">
+                <MenuItem Header="_Commit..." InputGesture="Ctrl+K" Click="OnCommitClick"
+                          IsEnabled="{Binding IsProjectMode}" />
+                <MenuItem Header="View _History..." Click="OnViewHistoryClick"
+                          IsEnabled="{Binding HasVersionHistory}" />
+                <Separator />
+                <MenuItem Header="_Revert to Commit..." Click="OnRevertClick"
+                          IsEnabled="{Binding HasVersionHistory}" />
+            </MenuItem>
+        </Menu>
+
+        <!-- Formatting Toolbar -->
+        <Border Name="FormattingToolbar" DockPanel.Dock="Top" BorderBrush="#DDDDDD" BorderThickness="0,0,0,1"
+                Padding="8,4">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <Button Name="BoldButton" Content="B" FontWeight="Bold"
+                        Width="32" Height="28" Click="OnBoldClick"
+                        ToolTip.Tip="Bold (Ctrl+B)" />
+                <Button Name="ItalicButton" Content="I" FontStyle="Italic"
+                        Width="32" Height="28" Click="OnItalicClick"
+                        ToolTip.Tip="Italic (Ctrl+I)" />
+                <Button Name="UnderlineButton" Width="32" Height="28"
+                        Click="OnUnderlineClick" ToolTip.Tip="Underline (Ctrl+U)">
+                    <TextBlock Text="U" TextDecorations="Underline" />
+                </Button>
+                <Border Width="1" Background="#CCCCCC" Margin="4,2" />
+                <ComboBox Name="HeaderCombo" Width="100" Height="28"
+                          SelectedIndex="0" SelectionChanged="OnHeaderChanged">
+                    <ComboBoxItem Content="Normal" />
+                    <ComboBoxItem Content="Heading 1" />
+                    <ComboBoxItem Content="Heading 2" />
+                    <ComboBoxItem Content="Heading 3" />
+                </ComboBox>
+            </StackPanel>
+        </Border>
+
+        <!-- Editor with Outline Pane and Project Pane -->
+        <Grid ColumnDefinitions="Auto,*,Auto">
+            <!-- Outline Pane -->
+            <Border Grid.Column="0"
+                    IsVisible="{Binding IsOutlineVisible}"
+                    Width="220"
+                    Background="#F5F5F5"
+                    BorderBrush="#DDDDDD"
+                    BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Outline"
+                               FontWeight="SemiBold"
+                               Margin="12,8,12,4" />
+                    <ListBox Name="OutlineList"
+                             ItemsSource="{Binding OutlineItems}"
+                             Background="Transparent"
+                             SelectionChanged="OnOutlineItemSelected">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Title}"
+                                           Margin="{Binding IndentMargin}"
+                                           Padding="0,2"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- Editor -->
+            <ae:TextEditor Name="Editor"
+                           Grid.Column="1"
+                           FontSize="14"
+                           Foreground="Black"
+                           Background="White"
+                           ShowLineNumbers="True"
+                           VerticalScrollBarVisibility="Auto"
+                           MinHeight="300"
+                           MinWidth="400"/>
+
+            <!-- Project Pane -->
+            <Border Grid.Column="2"
+                    IsVisible="{Binding IsProjectPaneVisible}"
+                    Width="220"
+                    Background="#F5F5F5"
+                    BorderBrush="#DDDDDD"
+                    BorderThickness="1,0,0,0">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Project Files"
+                               FontWeight="SemiBold"
+                               Margin="12,8,12,4" />
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="4"
+                                Margin="8,4" HorizontalAlignment="Center">
+                        <Button Content="Add" Width="50" Click="OnAddFileToProjectClick"
+                                ToolTip.Tip="Add file to project" />
+                        <Button Content="Remove" Width="60" Click="OnRemoveFileFromProjectClick"
+                                ToolTip.Tip="Remove file from project" />
+                        <Button Content="Up" Width="36" Click="OnMoveFileUpClick"
+                                ToolTip.Tip="Move file up" />
+                        <Button Content="Down" Width="46" Click="OnMoveFileDownClick"
+                                ToolTip.Tip="Move file down" />
+                    </StackPanel>
+                    <ListBox Name="ProjectFileList"
+                             ItemsSource="{Binding ProjectFiles}"
+                             SelectedItem="{Binding ActiveProjectFile}"
+                             Background="Transparent"
+                             SelectionChanged="OnProjectFileSelected">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding FileName}"
+                                           Padding="4,2"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>
