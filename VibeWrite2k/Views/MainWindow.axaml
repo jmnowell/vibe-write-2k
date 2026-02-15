@@ -27,7 +27,7 @@
             </MenuItem>
             <MenuItem Header="_View">
                 <MenuItem Header="Toggle _Outline" InputGesture="Ctrl+Shift+O" Click="OnToggleOutlineClick" />
-                <MenuItem Header="_Focus Mode" InputGesture="F11" Click="OnToggleFocusModeClick" />
+                <MenuItem Header="_Focus Mode" InputGesture="Ctrl+Shift+F" Click="OnToggleFocusModeClick" />
             </MenuItem>
             <MenuItem Header="_Tools">
                 <MenuItem Header="_Check Spelling..." InputGesture="F7" Click="OnCheckSpellingClick" />

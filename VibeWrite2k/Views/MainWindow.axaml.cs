@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     private ITransform? _savedTextViewTransform;
     private TranslateTransform? _focusModeTransform;
     private double _savedFontSize;
+    private double _savedMaxWidth;
     private HorizontalAlignment _savedHorizontalAlignment;
 
     // Project state
@@ -64,9 +65,8 @@ public partial class MainWindow : Window
         _debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _debounceTimer.Tick += OnDebounceTimerTick;
 
-        // Enable word wrap and constrain to 80 characters
+        // Enable word wrap
         Editor.WordWrap = true;
-        UpdateEditorMaxWidth();
 
         // Wire up editor transformers
         Editor.TextArea.TextView.LineTransformers.Add(_colorizer);
@@ -74,8 +74,8 @@ public partial class MainWindow : Window
         // Wire up text change handler
         Editor.TextChanged += OnTextChanged;
 
-        // Wire up keyboard shortcuts
-        KeyDown += OnKeyDown;
+        // Wire up keyboard shortcuts (tunnel so Escape is caught before the editor)
+        AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
 
         // Bind window title
         _viewModel.PropertyChanged += (_, e) =>
@@ -138,7 +138,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (e.Key == Key.F11 && e.KeyModifiers == KeyModifiers.None)
+        if (e.Key == Key.F && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
         {
             ToggleFocusMode();
             e.Handled = true;
@@ -289,8 +289,9 @@ public partial class MainWindow : Window
             _viewModel.IsProjectPaneVisible = false;
             Editor.ShowLineNumbers = false;
 
-            // Increase font size for fullscreen readability and recalculate 80-char width
+            // Increase font size for fullscreen readability and constrain to 80 chars
             _savedFontSize = Editor.FontSize;
+            _savedMaxWidth = Editor.MaxWidth;
             Editor.FontSize = _savedFontSize * 1.4;
             UpdateEditorMaxWidth();
 
@@ -330,9 +331,9 @@ public partial class MainWindow : Window
             if (_viewModel.IsProjectMode)
                 _viewModel.IsProjectPaneVisible = true;
 
-            // Restore font size, recalculate 80-char width, and restore alignment
+            // Restore font size, max width, and alignment
             Editor.FontSize = _savedFontSize;
-            UpdateEditorMaxWidth();
+            Editor.MaxWidth = _savedMaxWidth;
             Editor.HorizontalAlignment = _savedHorizontalAlignment;
 
             // Remove dimming transformer
