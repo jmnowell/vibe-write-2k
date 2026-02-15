@@ -10,6 +10,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using AvaloniaEdit;
 using AvaloniaEdit.Rendering;
 using Markdig.Syntax;
@@ -40,6 +41,7 @@ public partial class MainWindow : Window
     private double _savedFontSize;
     private double _savedMaxWidth;
     private HorizontalAlignment _savedHorizontalAlignment;
+    private Vector? _savedEditorScrollOffset;
 
     // Project state
     private readonly Dictionary<string, string> _projectFileContents = new();
@@ -280,6 +282,7 @@ public partial class MainWindow : Window
         {
             // Save state to restore later
             _wasOutlineVisible = _viewModel.IsOutlineVisible;
+            _savedEditorScrollOffset = GetEditorScrollViewer()?.Offset;
 
             // Enter focus mode
             WindowState = WindowState.FullScreen;
@@ -348,6 +351,7 @@ public partial class MainWindow : Window
             // Unsubscribe from caret changes
             Editor.TextArea.Caret.PositionChanged -= OnFocusCaretPositionChanged;
 
+            RestoreEditorScrollOffset();
             Editor.TextArea.TextView.Redraw();
         }
     }
@@ -366,6 +370,7 @@ public partial class MainWindow : Window
 
     private void ScrollCaretToCenter()
     {
+        if (!_viewModel.IsFocusMode) return;
         var textView = Editor.TextArea.TextView;
         Editor.TextArea.Caret.BringCaretToView();
         textView.EnsureVisualLines();
@@ -379,6 +384,24 @@ public partial class MainWindow : Window
         _focusModeTransform.X = 0;
         _focusModeTransform.Y = offset;
         textView.RenderTransform = _focusModeTransform;
+    }
+
+    private ScrollViewer? GetEditorScrollViewer()
+    {
+        return Editor.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+    }
+
+    private void RestoreEditorScrollOffset()
+    {
+        if (!_savedEditorScrollOffset.HasValue) return;
+        var offset = _savedEditorScrollOffset.Value;
+        _savedEditorScrollOffset = null;
+        Dispatcher.UIThread.Post(() =>
+        {
+            var scrollViewer = GetEditorScrollViewer();
+            if (scrollViewer != null)
+                scrollViewer.Offset = offset;
+        }, DispatcherPriority.Loaded);
     }
 
     // File operations
