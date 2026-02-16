@@ -68,6 +68,51 @@
             </StackPanel>
         </Border>
 
+        <!-- Tab Bar (project mode only) -->
+        <Border Name="TabBar" DockPanel.Dock="Top"
+                IsVisible="{Binding IsTabBarVisible}"
+                Background="#F0F0F0"
+                BorderBrush="#DDDDDD"
+                BorderThickness="0,0,0,1"
+                Padding="4,0">
+            <ItemsControl Name="TabItemsControl" ItemsSource="{Binding OpenTabs}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="0" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Name="TabBorder"
+                                Background="#E8E8E8"
+                                BorderBrush="#CCCCCC"
+                                BorderThickness="1,1,1,0"
+                                CornerRadius="4,4,0,0"
+                                Margin="0,4,2,0"
+                                Padding="8,4,4,4"
+                                Cursor="Hand"
+                                PointerPressed="OnTabPointerPressed">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="{Binding DisplayName}"
+                                           VerticalAlignment="Center"
+                                           FontSize="12" />
+                                <Button Content="x"
+                                        FontSize="10"
+                                        Width="18" Height="18"
+                                        Padding="0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Click="OnTabCloseClick"
+                                        ToolTip.Tip="Close tab" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Border>
+
         <!-- Editor with Outline Pane and Project Pane -->
         <Grid ColumnDefinitions="Auto,*,Auto">
             <!-- Outline Pane -->

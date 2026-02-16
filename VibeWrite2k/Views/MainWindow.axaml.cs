@@ -36,6 +36,7 @@ public partial class MainWindow : Window
     private bool _suppressTextChanged;
     private bool _initialized;
     private bool _wasOutlineVisible;
+    private bool _wasProjectPaneVisible;
     private ITransform? _savedTextViewTransform;
     private TranslateTransform? _focusModeTransform;
     private double _savedFontSize;
@@ -94,6 +95,8 @@ public partial class MainWindow : Window
         if (_suppressTextChanged) return;
 
         _viewModel.MarkDirty();
+        if (_viewModel.ActiveTab != null)
+            _viewModel.ActiveTab.IsDirty = true;
         _debounceTimer.Stop();
         _debounceTimer.Start();
     }
@@ -282,12 +285,14 @@ public partial class MainWindow : Window
         {
             // Save state to restore later
             _wasOutlineVisible = _viewModel.IsOutlineVisible;
+            _wasProjectPaneVisible = _viewModel.IsProjectPaneVisible;
             _savedEditorScrollOffset = GetEditorScrollViewer()?.Offset;
 
             // Enter focus mode
             WindowState = WindowState.FullScreen;
             MainMenu.IsVisible = false;
             FormattingToolbar.IsVisible = false;
+            TabBar.IsVisible = false;
             _viewModel.IsOutlineVisible = false;
             _viewModel.IsProjectPaneVisible = false;
             Editor.ShowLineNumbers = false;
@@ -330,9 +335,13 @@ public partial class MainWindow : Window
             // Restore outline visibility
             _viewModel.IsOutlineVisible = _wasOutlineVisible;
 
-            // Restore project pane visibility
+            // Restore project pane and tab bar visibility
             if (_viewModel.IsProjectMode)
-                _viewModel.IsProjectPaneVisible = true;
+            {
+                _viewModel.IsProjectPaneVisible = _wasProjectPaneVisible;
+                if (_viewModel.IsTabBarVisible)
+                    TabBar.IsVisible = true;
+            }
 
             // Restore font size, max width, and alignment
             Editor.FontSize = _savedFontSize;
@@ -454,6 +463,11 @@ public partial class MainWindow : Window
             await File.WriteAllTextAsync(absPath, Editor.Text);
             _projectFileContents[absPath] = Editor.Text;
             _viewModel.MarkClean();
+            if (_viewModel.ActiveTab != null)
+            {
+                _viewModel.ActiveTab.Content = Editor.Text;
+                _viewModel.ActiveTab.IsDirty = false;
+            }
             if (_viewModel.Project != null)
                 _viewModel.UpdateVersionHistoryState(
                     _versioningService.HasHistory(_viewModel.Project, absPath));
@@ -514,6 +528,7 @@ public partial class MainWindow : Window
 
     private void CloseProject()
     {
+        _viewModel.ClearTabs();
         _viewModel.Project = null;
         _viewModel.IsProjectMode = false;
         _viewModel.IsProjectPaneVisible = false;
@@ -639,43 +654,152 @@ public partial class MainWindow : Window
 
     private void SwitchToProjectFile(ProjectFile targetFile)
     {
-        // Save current content if dirty
-        if (_viewModel.IsDirty && _viewModel.ActiveProjectFile != null)
+        // Save current tab state (content, caret, scroll)
+        if (_viewModel.ActiveTab != null)
         {
-            var currentPath = _viewModel.ActiveProjectFile.AbsolutePath;
-            _projectFileContents[currentPath] = Editor.Text;
-            File.WriteAllText(currentPath, Editor.Text);
+            _viewModel.ActiveTab.Content = Editor.Text;
+            _viewModel.ActiveTab.CaretOffset = Editor.TextArea.Caret.Offset;
+            _viewModel.ActiveTab.ScrollOffset = GetEditorScrollViewer()?.Offset.Y ?? 0;
+            _viewModel.ActiveTab.IsDirty = _viewModel.IsDirty;
+
+            // Also sync to project file contents/disk
+            if (_viewModel.IsDirty && _viewModel.ActiveProjectFile != null)
+            {
+                var currentPath = _viewModel.ActiveProjectFile.AbsolutePath;
+                _projectFileContents[currentPath] = Editor.Text;
+                File.WriteAllText(currentPath, Editor.Text);
+            }
         }
+
+        // Open or activate tab for target file
+        var tab = _viewModel.OpenTab(targetFile);
 
         _suppressProjectFileSelection = true;
         _viewModel.ActiveProjectFile = targetFile;
         _suppressProjectFileSelection = false;
 
-        // Load the target file's content
+        // Load content from tab (or from project file contents as fallback)
         _suppressTextChanged = true;
-        if (_projectFileContents.TryGetValue(targetFile.AbsolutePath, out var content))
+        if (!string.IsNullOrEmpty(tab.Content))
+            Editor.Text = tab.Content;
+        else if (_projectFileContents.TryGetValue(targetFile.AbsolutePath, out var content))
+        {
             Editor.Text = content;
+            tab.Content = content;
+        }
         else
             Editor.Text = "";
         _suppressTextChanged = false;
 
         _viewModel.SetFilePath(targetFile.AbsolutePath);
-        _viewModel.MarkClean();
+        if (tab.IsDirty)
+            _viewModel.MarkDirty();
+        else
+            _viewModel.MarkClean();
+
+        // Restore caret and scroll position
+        if (tab.CaretOffset > 0 && tab.CaretOffset <= Editor.Document.TextLength)
+            Editor.TextArea.Caret.Offset = tab.CaretOffset;
+        if (tab.ScrollOffset > 0)
+        {
+            var scrollOffset = tab.ScrollOffset;
+            Dispatcher.UIThread.Post(() =>
+            {
+                var sv = GetEditorScrollViewer();
+                if (sv != null)
+                    sv.Offset = new Vector(sv.Offset.X, scrollOffset);
+            }, DispatcherPriority.Loaded);
+        }
 
         if (_viewModel.Project != null)
             _viewModel.UpdateVersionHistoryState(
                 _versioningService.HasHistory(_viewModel.Project, targetFile.AbsolutePath));
 
         ReparseAndRedraw();
+        UpdateTabStyles();
     }
 
     private void OnProjectFileSelected(object? sender, SelectionChangedEventArgs e)
     {
         if (_suppressProjectFileSelection) return;
         if (ProjectFileList.SelectedItem is not ProjectFile selectedFile) return;
-        if (_viewModel.ActiveProjectFile?.AbsolutePath == selectedFile.AbsolutePath) return;
 
         SwitchToProjectFile(selectedFile);
+    }
+
+    // Tab bar handlers
+    private void OnTabPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Border border) return;
+        if (border.DataContext is not EditorTab tab) return;
+        if (_viewModel.ActiveTab == tab) return;
+
+        SwitchToProjectFile(tab.ProjectFile);
+    }
+
+    private async void OnTabCloseClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn) return;
+        // Walk up to find the tab DataContext
+        var parent = btn.Parent; // StackPanel
+        var border = parent?.Parent as Border; // TabBorder
+        if (border?.DataContext is not EditorTab tab) return;
+
+        // Prompt save if dirty
+        if (tab.IsDirty)
+        {
+            var confirmed = await ShowConfirmDialogAsync("Unsaved Changes",
+                $"Save changes to '{tab.ProjectFile.FileName}' before closing?");
+            if (confirmed)
+            {
+                await File.WriteAllTextAsync(tab.ProjectFile.AbsolutePath, tab.Content);
+                _projectFileContents[tab.ProjectFile.AbsolutePath] = tab.Content;
+            }
+        }
+
+        var nextTab = _viewModel.CloseTab(tab);
+        if (nextTab != null)
+        {
+            SwitchToProjectFile(nextTab.ProjectFile);
+        }
+        else
+        {
+            _viewModel.ActiveProjectFile = null;
+            _suppressTextChanged = true;
+            Editor.Text = "";
+            _suppressTextChanged = false;
+            _viewModel.NewDocument();
+            _viewModel.UpdateVersionHistoryState(false);
+        }
+    }
+
+    private void UpdateTabStyles()
+    {
+        if (TabItemsControl == null) return;
+
+        // Defer to ensure the visual tree is updated
+        Dispatcher.UIThread.Post(() =>
+        {
+            var containers = TabItemsControl.GetVisualDescendants().OfType<Border>()
+                .Where(b => b.Name == "TabBorder");
+
+            foreach (var border in containers)
+            {
+                if (border.DataContext is EditorTab tab)
+                {
+                    bool isActive = tab == _viewModel.ActiveTab;
+                    border.Background = isActive
+                        ? Brushes.White
+                        : new SolidColorBrush(Color.FromRgb(232, 232, 232));
+                    border.BorderBrush = isActive
+                        ? new SolidColorBrush(Color.FromRgb(0, 122, 204))
+                        : new SolidColorBrush(Color.FromRgb(204, 204, 204));
+                    border.BorderThickness = isActive
+                        ? new Thickness(1, 2, 1, 0)
+                        : new Thickness(1, 1, 1, 0);
+                }
+            }
+        }, DispatcherPriority.Loaded);
     }
 
     private async void OnAddFileToProjectClick(object? sender, RoutedEventArgs e)
@@ -710,6 +834,11 @@ public partial class MainWindow : Window
 
             RefreshProjectFileList();
             _viewModel.UpdateProjectOutline(_projectFileAsts);
+
+            // Auto-switch to the newly created file
+            var newFile = _viewModel.ProjectFiles.FirstOrDefault(f => f.AbsolutePath == absPath);
+            if (newFile != null)
+                SwitchToProjectFile(newFile);
         }
         else // "existing"
         {
@@ -749,6 +878,11 @@ public partial class MainWindow : Window
 
             RefreshProjectFileList();
             _viewModel.UpdateProjectOutline(_projectFileAsts);
+
+            // Auto-switch to the added file
+            var addedFile = _viewModel.ProjectFiles.FirstOrDefault(f => f.AbsolutePath == path);
+            if (addedFile != null)
+                SwitchToProjectFile(addedFile);
         }
     }
 
@@ -768,11 +902,22 @@ public partial class MainWindow : Window
         _projectFileContents.Remove(removedFile.AbsolutePath);
         _projectFileAsts.Remove(removedFile.AbsolutePath);
 
+        // Close the tab for the removed file
+        var tabToClose = _viewModel.OpenTabs.FirstOrDefault(
+            t => t.ProjectFile.AbsolutePath == removedFile.AbsolutePath);
+        EditorTab? nextTab = null;
+        if (tabToClose != null)
+            nextTab = _viewModel.CloseTab(tabToClose);
+
         RefreshProjectFileList();
         _viewModel.UpdateProjectOutline(_projectFileAsts);
 
-        // Switch to first remaining file or clear editor
-        if (_viewModel.ProjectFiles.Count > 0)
+        // Switch to adjacent tab or first remaining file
+        if (nextTab != null)
+        {
+            SwitchToProjectFile(nextTab.ProjectFile);
+        }
+        else if (_viewModel.ProjectFiles.Count > 0)
         {
             SwitchToProjectFile(_viewModel.ProjectFiles[0]);
         }
